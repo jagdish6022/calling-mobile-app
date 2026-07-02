@@ -43,8 +43,7 @@
           "imageWidth": 76
         }
       ],
-      "./plugins/withWorkManagerForeground",
-      "expo-sharing"
+      "./plugins/withWorkManagerForeground"
     ],
     "experiments": {
       "typedRoutes": true,
