@@ -11,6 +11,16 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.callingapp",
+      "permissions": [
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.ANSWER_PHONE_CALLS",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_PHONE_CALL"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -32,7 +42,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "./plugins/withWorkManagerForeground",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

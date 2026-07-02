@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+  id 'kotlin-kapt'
+}
+
+group = 'expo.modules.callingappmodule'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.callingappmodule"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation "androidx.room:room-runtime:2.6.1"
+  implementation "androidx.room:room-ktx:2.6.1"
+  kapt "androidx.room:room-compiler:2.6.1"
+  implementation "androidx.work:work-runtime-ktx:2.9.0"
+}
+
