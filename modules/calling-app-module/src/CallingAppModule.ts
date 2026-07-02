@@ -2,6 +2,10 @@ import { NativeModule, requireNativeModule } from 'expo';
 import { Campaign, Contact, CallLog, Settings } from './CallingAppModule.types';
 
 declare class CallingAppModule extends NativeModule {
+  // Permissions
+  checkPermissions(): Promise<{ CALL_PHONE: boolean; READ_PHONE_STATE: boolean; RECORD_AUDIO: boolean }>;
+  requestPermissions(): Promise<boolean>;
+
   // Campaign
   createCampaign(campaignName: string, delay: number, retry: number): Promise<Campaign>;
   getCampaigns(): Promise<Campaign[]>;

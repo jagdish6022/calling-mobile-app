@@ -25,9 +25,40 @@ export default function HomeScreen() {
   const [activeContacts, setActiveContacts] = useState<Contact[]>([]);
   const [runningTime, setRunningTime] = useState(0);
 
+  // Permissions state
+  const [permissionsGranted, setPermissionsGranted] = useState({
+    CALL_PHONE: true,
+    READ_PHONE_STATE: true,
+    RECORD_AUDIO: true
+  });
+
+  const checkAppPermissions = async () => {
+    try {
+      const perms = await CallingAppModule.checkPermissions();
+      setPermissionsGranted(perms);
+      return perms.CALL_PHONE && perms.READ_PHONE_STATE && perms.RECORD_AUDIO;
+    } catch (e) {
+      console.log('Error checking permissions:', e);
+      return true;
+    }
+  };
+
+  const requestAppPermissions = async () => {
+    try {
+      await CallingAppModule.requestPermissions();
+      // Re-check after 1.5 seconds to let the system dialog close
+      setTimeout(() => {
+        checkAppPermissions();
+      }, 1500);
+    } catch (e) {
+      console.log('Error requesting permissions:', e);
+    }
+  };
+
   // Load campaigns from local Room database
   const loadCampaigns = async () => {
     try {
+      await checkAppPermissions();
       const list = await CallingAppModule.getCampaigns();
       setCampaigns(list);
       
@@ -52,7 +83,6 @@ export default function HomeScreen() {
   // Run on screen focus
   useFocusEffect(
     useCallback(() => {
-      // Recover unfinished campaigns (e.g. if the app crashed or restarted)
       CallingAppModule.recoverUnfinishedCampaigns()
         .then(() => loadCampaigns())
         .catch((err) => {
@@ -107,6 +137,20 @@ export default function HomeScreen() {
   };
 
   const startCampaign = async (campaignId: number) => {
+    // Verify permissions first
+    const hasPerms = await checkAppPermissions();
+    if (!hasPerms) {
+      Alert.alert(
+        'Permissions Needed',
+        'Please grant cellular calling, phone status, and voice recording permissions before starting a campaign.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Grant Now', onPress: requestAppPermissions }
+        ]
+      );
+      return;
+    }
+
     try {
       await CallingAppModule.updateCampaignStatus(campaignId, 'RUNNING');
       await CallingAppModule.startCampaign(campaignId);
@@ -152,7 +196,7 @@ export default function HomeScreen() {
     );
   };
 
-  // Helper stats calculations
+  // Helper stats calculations using non-technical terms
   const total = activeContacts.length;
   const completed = activeContacts.filter(c => c.status === 'COMPLETED').length;
   const busy = activeContacts.filter(c => c.status === 'BUSY' || c.status === 'NO_ANSWER').length;
@@ -171,6 +215,8 @@ export default function HomeScreen() {
       secs.toString().padStart(2, '0')
     ].join(':');
   };
+
+  const hasAllPermissions = permissionsGranted.CALL_PHONE && permissionsGranted.READ_PHONE_STATE && permissionsGranted.RECORD_AUDIO;
 
   if (loading) {
     return (
@@ -203,12 +249,28 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Permission Request Banner */}
+        {!hasAllPermissions && (
+          <GlassCard style={styles.permissionCard} borderColor="#FFB74D" glow>
+            <View style={styles.permissionHeader}>
+              <Ionicons name="shield-alert-outline" size={24} color="#FFB74D" />
+              <Text style={styles.permissionTitle}>Phone Permissions Needed</Text>
+            </View>
+            <Text style={styles.permissionText}>
+              This app requires Call Phone, Read Phone Status, and Microphone permissions to make SIM calls and play broadcasts.
+            </Text>
+            <TouchableOpacity style={styles.grantBtn} onPress={requestAppPermissions}>
+              <Text style={styles.grantBtnText}>Grant App Permissions</Text>
+            </TouchableOpacity>
+          </GlassCard>
+        )}
+
         {/* Active Campaign Card */}
         {activeCampaign ? (
           <GlassCard style={styles.activeCard} borderColor="#00E5FF" glow>
             <View style={styles.activeHeader}>
               <View>
-                <Text style={styles.activeLabel}>ACTIVE CAMPAIGN</Text>
+                <Text style={styles.activeLabel}>ACTIVE CAMPAIGN RUNNING</Text>
                 <Text style={styles.activeTitle}>{activeCampaign.campaignName}</Text>
               </View>
               <Text style={styles.timer}>{formatRunningTime(runningTime)}</Text>
@@ -219,7 +281,7 @@ export default function HomeScreen() {
               <View style={styles.progressBarBg}>
                 <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
               </View>
-              <Text style={styles.progressText}>{progressPercent}% Done</Text>
+              <Text style={styles.progressText}>{progressPercent}% Dialed</Text>
             </View>
 
             {/* Metrics grid */}
@@ -230,7 +292,7 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.gridItem, styles.completedBorder]}>
                 <Text style={[styles.gridVal, { color: '#69F0AE' }]}>{completed}</Text>
-                <Text style={styles.gridLbl}>Success</Text>
+                <Text style={styles.gridLbl}>Delivered</Text>
               </View>
               <View style={[styles.gridItem, styles.busyBorder]}>
                 <Text style={[styles.gridVal, { color: '#FFAB40' }]}>{busy}</Text>
@@ -242,7 +304,7 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.gridItem, styles.dialingBorder]}>
                 <Text style={[styles.gridVal, { color: '#40C4FF' }]}>{dialing + pending}</Text>
-                <Text style={styles.gridLbl}>Pending</Text>
+                <Text style={styles.gridLbl}>Remaining</Text>
               </View>
             </View>
 
@@ -260,7 +322,7 @@ export default function HomeScreen() {
                 onPress={() => stopCampaign(activeCampaign.campaignId)}
               >
                 <Ionicons name="stop" size={20} color="#FF5252" />
-                <Text style={styles.stopBtnText}>End Campaign</Text>
+                <Text style={styles.stopBtnText}>End Calling</Text>
               </TouchableOpacity>
             </View>
           </GlassCard>
@@ -269,14 +331,14 @@ export default function HomeScreen() {
             <Ionicons name="radio-outline" size={40} color="#60646C" style={styles.idleIcon} />
             <Text style={styles.idleTitle}>No Active Broadcast</Text>
             <Text style={styles.idleText}>
-              Select a campaign below or create a new one to start broadcasting using your phone's SIM.
+              Select a campaign below or click "+ Campaign" to record a message and start broadcasting.
             </Text>
           </GlassCard>
         )}
 
         {/* Campaign list */}
         <View style={styles.listSection}>
-          <Text style={styles.sectionTitle}>Campaigns</Text>
+          <Text style={styles.sectionTitle}>Your Calling Campaigns</Text>
           {campaigns.length === 0 ? (
             <Text style={styles.emptyText}>No campaigns created yet. Tap "+ Campaign" above.</Text>
           ) : (
@@ -291,11 +353,11 @@ export default function HomeScreen() {
                     <View style={styles.campaignInfo}>
                       <Text style={styles.campaignName}>{camp.campaignName}</Text>
                       <Text style={styles.campaignSub}>
-                        {camp.totalContacts} Contacts • {camp.delayBetweenCalls}s Delay
+                        {camp.totalContacts} Contacts • {camp.delayBetweenCalls}s Wait Time
                       </Text>
                     </View>
                     <View style={styles.campaignAction}>
-                      <StatusBadge status={camp.status} />
+                      <StatusBadge status={camp.status === 'RUNNING' ? 'DIALING' : camp.status} />
                       <View style={{ width: 8 }} />
                       {camp.status !== 'RUNNING' && (
                         <TouchableOpacity
@@ -309,13 +371,13 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Quick Start / Play button if draft or paused */}
-                  {camp.status !== 'RUNNING' && camp.status !== 'COMPLETED' && (
+                  {camp.status !== 'RUNNING' && camp.status !== 'COMPLETED' && camp.totalContacts > 0 && (
                     <TouchableOpacity
                       style={styles.quickStartBtn}
                       onPress={() => startCampaign(camp.campaignId)}
                     >
                       <Ionicons name="play" size={16} color="#000" />
-                      <Text style={styles.quickStartText}>Start Calling</Text>
+                      <Text style={styles.quickStartText}>Start Automatic Calling</Text>
                     </TouchableOpacity>
                   )}
                 </GlassCard>
@@ -376,6 +438,40 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '700',
     fontSize: 14,
+  },
+  permissionCard: {
+    backgroundColor: '#241E15',
+    borderColor: '#FFB74D',
+    marginBottom: 20,
+    padding: 16,
+  },
+  permissionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  permissionTitle: {
+    color: '#FFB74D',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  permissionText: {
+    color: '#FFE0B2',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  grantBtn: {
+    backgroundColor: '#FFB74D',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  grantBtnText: {
+    color: '#000',
+    fontWeight: '800',
+    fontSize: 13,
   },
   activeCard: {
     marginBottom: 24,
