@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
-  SafeAreaView,
   ActivityIndicator,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -21,7 +21,7 @@ import StatusBadge from '@/components/StatusBadge';
 export default function ContactsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const campaignId = parseInt(id as string);
+  const campaignId = id ? parseInt(id as string) : NaN;
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
@@ -34,6 +34,7 @@ export default function ContactsScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadContacts = async () => {
+    if (isNaN(campaignId)) return;
     try {
       const list = await CallingAppModule.getContacts(campaignId);
       setContacts(list);
@@ -46,7 +47,9 @@ export default function ContactsScreen() {
   };
 
   useEffect(() => {
-    loadContacts();
+    if (!isNaN(campaignId)) {
+      loadContacts();
+    }
   }, [campaignId]);
 
   const handleAddManual = async () => {

@@ -7,18 +7,19 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import CallingAppModule, { Campaign, Contact } from '@/modules/calling-app-module/src/CallingAppModule';
+import CallingAppModule, { Campaign, Contact, CallLog } from '@/modules/calling-app-module/src/CallingAppModule';
 import GlassCard from '@/components/GlassCard';
 import StatusBadge from '@/components/StatusBadge';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [allLogs, setAllLogs] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
@@ -61,9 +62,12 @@ export default function HomeScreen() {
       await checkAppPermissions();
       const list = await CallingAppModule.getCampaigns();
       setCampaigns(list);
+
+      const logs = await CallingAppModule.getAllLogs();
+      setAllLogs(logs);
       
       // Find campaign currently marked as RUNNING
-      const active = list.find((c) => c.status === 'RUNNING');
+      const active = list.find((c: Campaign) => c.status === 'RUNNING');
       if (active) {
         setActiveCampaign(active);
         const contactsList = await CallingAppModule.getContacts(active.campaignId);
@@ -85,7 +89,7 @@ export default function HomeScreen() {
     useCallback(() => {
       CallingAppModule.recoverUnfinishedCampaigns()
         .then(() => loadCampaigns())
-        .catch((err) => {
+        .catch((err: any) => {
           console.error(err);
           loadCampaigns();
         });
@@ -94,7 +98,7 @@ export default function HomeScreen() {
 
   // Poll progress when a campaign is running
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (activeCampaign) {
       timer = setInterval(async () => {
         try {
@@ -120,7 +124,7 @@ export default function HomeScreen() {
 
   // Campaign running timer tick
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (activeCampaign && activeCampaign.status === 'RUNNING') {
       timer = setInterval(() => {
         setRunningTime((prev) => prev + 1);
@@ -253,7 +257,7 @@ export default function HomeScreen() {
         {!hasAllPermissions && (
           <GlassCard style={styles.permissionCard} borderColor="#FFB74D" glow>
             <View style={styles.permissionHeader}>
-              <Ionicons name="shield-alert-outline" size={24} color="#FFB74D" />
+              <Ionicons name="alert-circle-outline" size={24} color="#FFB74D" />
               <Text style={styles.permissionTitle}>Phone Permissions Needed</Text>
             </View>
             <Text style={styles.permissionText}>
@@ -264,6 +268,47 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </GlassCard>
         )}
+
+        {/* System Overview Dashboard (NEW) */}
+        <GlassCard style={styles.overviewCard} borderColor="rgba(255, 255, 255, 0.08)">
+          <Text style={styles.overviewHeaderTitle}>System Status</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statsIconCircle, { backgroundColor: 'rgba(0, 229, 255, 0.08)' }]}>
+                <Ionicons name="megaphone-outline" size={16} color="#00E5FF" />
+              </View>
+              <Text style={styles.statsVal}>{campaigns.length}</Text>
+              <Text style={styles.statsLbl}>Campaigns</Text>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statsIconCircle, { backgroundColor: 'rgba(105, 240, 174, 0.08)' }]}>
+                <Ionicons name="people-outline" size={16} color="#69F0AE" />
+              </View>
+              <Text style={styles.statsVal}>
+                {campaigns.reduce((acc, curr) => acc + curr.totalContacts, 0)}
+              </Text>
+              <Text style={styles.statsLbl}>Contacts</Text>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statsIconCircle, { backgroundColor: 'rgba(213, 0, 249, 0.08)' }]}>
+                <Ionicons name="call-outline" size={16} color="#D500F9" />
+              </View>
+              <Text style={styles.statsVal}>{allLogs.length}</Text>
+              <Text style={styles.statsLbl}>Calls Made</Text>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statsIconCircle, { backgroundColor: 'rgba(255, 171, 64, 0.08)' }]}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#FFAB40" />
+              </View>
+              <Text style={styles.statsVal}>
+                {allLogs.length > 0
+                  ? `${Math.round((allLogs.filter(l => l.status === 'COMPLETED').length / allLogs.length) * 100)}%`
+                  : '0%'}
+              </Text>
+              <Text style={styles.statsLbl}>Success</Text>
+            </View>
+          </View>
+        </GlassCard>
 
         {/* Active Campaign Card */}
         {activeCampaign ? (
@@ -348,7 +393,7 @@ export default function HomeScreen() {
                 style={styles.campaignItem}
                 onPress={() => router.push(`/campaign/${camp.campaignId}`)}
               >
-                <GlassCard style={styles.campaignCard}>
+                <GlassCard style={[styles.campaignCard, camp.status === 'RUNNING' && styles.runningCampaignCard]}>
                   <View style={styles.campaignMeta}>
                     <View style={styles.campaignInfo}>
                       <Text style={styles.campaignName}>{camp.campaignName}</Text>
@@ -364,9 +409,11 @@ export default function HomeScreen() {
                           style={styles.deleteBtn}
                           onPress={() => deleteCampaign(camp.campaignId)}
                         >
-                          <Ionicons name="trash-outline" size={18} color="#FF5252" />
+                          <Ionicons name="trash-outline" size={16} color="#FF5252" />
                         </TouchableOpacity>
                       )}
+                      <View style={{ width: 6 }} />
+                      <Ionicons name="chevron-forward" size={18} color="#4B5563" />
                     </View>
                   </View>
 
@@ -680,5 +727,56 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '700',
     fontSize: 12,
+  },
+  overviewCard: {
+    backgroundColor: '#111827',
+    padding: 16,
+    marginBottom: 24,
+  },
+  overviewHeaderTitle: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 14,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statsGridItem: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#1F2937',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  statsIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statsVal: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  statsLbl: {
+    color: '#9CA3AF',
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  runningCampaignCard: {
+    borderColor: '#00E5FF',
+    borderWidth: 1,
+    backgroundColor: '#112233',
   },
 });

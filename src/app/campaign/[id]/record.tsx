@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Animated,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import CallingAppModule from '@/modules/calling-app-module/src/CallingAppModule';
@@ -17,7 +17,7 @@ import GlassCard from '@/components/GlassCard';
 export default function RecordAudioScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const campaignId = parseInt(id as string);
+  const campaignId = id ? parseInt(id as string) : NaN;
 
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -27,7 +27,7 @@ export default function RecordAudioScreen() {
 
   // Animation values for pulsing microphone
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const durationTimer = useRef<NodeJS.Timeout | null>(null);
+  const durationTimer = useRef<any>(null);
 
   // Pulse animation loop
   useEffect(() => {

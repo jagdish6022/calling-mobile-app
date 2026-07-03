@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import CallingAppModule, { Campaign, Contact } from '@/modules/calling-app-module/src/CallingAppModule';
@@ -18,7 +18,7 @@ import StatusBadge from '@/components/StatusBadge';
 export default function CampaignDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const campaignId = parseInt(id as string);
+  const campaignId = id ? parseInt(id as string) : NaN;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -26,6 +26,7 @@ export default function CampaignDetailScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const loadData = async () => {
+    if (isNaN(campaignId)) return;
     try {
       const camp = await CallingAppModule.getCampaign(campaignId);
       setCampaign(camp);
@@ -43,13 +44,15 @@ export default function CampaignDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      if (!isNaN(campaignId)) {
+        loadData();
+      }
     }, [campaignId])
   );
 
   // Poll progress when running
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (campaign && campaign.status === 'RUNNING') {
       timer = setInterval(async () => {
         try {
@@ -473,10 +476,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   checklistCard: {
-    backgroundColor: '#1C1917',
-    borderColor: '#78716C',
+    backgroundColor: '#161922',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 20,
     gap: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFAB40',
   },
   checklistTitle: {
     color: '#FFF',
@@ -487,13 +492,13 @@ const styles = StyleSheet.create({
   checkItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   checkTextCol: {
     flex: 1,
   },
   checkLabel: {
-    color: '#D1D5DB',
+    color: '#E5E7EB',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -503,25 +508,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   checkCompleted: {
-    color: '#9CA3AF',
+    color: '#6B7280',
     textDecorationLine: 'line-through',
   },
   checkActionText: {
     color: '#00E5FF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 4,
-    textDecorationLine: 'underline',
   },
   checkSub: {
     color: '#9CA3AF',
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 15,
     marginTop: 2,
   },
   controlCard: {
     backgroundColor: '#111827',
     marginBottom: 24,
+    borderRadius: 20,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   statusRow: {
     flexDirection: 'row',
@@ -531,9 +537,9 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#9CA3AF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   actionRow: {
     flexDirection: 'row',
@@ -543,22 +549,27 @@ const styles = StyleSheet.create({
   startBtn: {
     flex: 1,
     flexDirection: 'row',
+    backgroundColor: '#00E5FF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00E5FF',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
     elevation: 3,
+    shadowColor: '#00E5FF',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   startBtnDisabled: {
     backgroundColor: '#374151',
-    opacity: 0.5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   startBtnText: {
     color: '#000',
     fontWeight: '800',
-    fontSize: 16,
+    fontSize: 14,
   },
   pauseBtn: {
     flex: 1,
@@ -592,29 +603,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  resetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
-    gap: 6,
-    marginTop: 10,
-  },
-  resetBtnText: {
-    color: '#B0B4BA',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   progressContainer: {
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   progressLabel: {
     color: '#9CA3AF',
@@ -622,19 +618,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   progressLabelVal: {
-    color: '#FFF',
+    color: '#00E5FF',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   progressBarBg: {
-    height: 6,
+    height: 8,
     backgroundColor: '#1F2937',
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: '#00E5FF',
+    borderRadius: 4,
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+    marginTop: 8,
+  },
+  resetBtnText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   sectionTitle: {
     color: '#FFF',
@@ -647,6 +657,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
     marginBottom: 24,
     justifyContent: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: '#00E5FF',
+    borderRadius: 16,
   },
   audioInfoRow: {
     flexDirection: 'row',
@@ -676,7 +689,7 @@ const styles = StyleSheet.create({
   },
   audioPlayBtn: {
     padding: 10,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#1F2937',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(0, 229, 255, 0.1)',
@@ -707,15 +720,16 @@ const styles = StyleSheet.create({
   recordBtn: {
     flexDirection: 'row',
     backgroundColor: '#00E5FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    elevation: 2,
   },
   recordBtnText: {
     color: '#000',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 12,
   },
   contactsHeader: {
@@ -732,19 +746,26 @@ const styles = StyleSheet.create({
   manageBtnText: {
     color: '#00E5FF',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   summaryCard: {
     backgroundColor: '#111827',
     marginBottom: 24,
+    borderRadius: 20,
   },
   summaryGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 6,
   },
   summaryItem: {
     alignItems: 'center',
     flex: 1,
+    backgroundColor: '#1F2937',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.02)',
   },
   summaryVal: {
     color: '#FFF',
@@ -753,26 +774,27 @@ const styles = StyleSheet.create({
   },
   summaryLbl: {
     color: '#9CA3AF',
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 8,
+    fontWeight: '700',
     marginTop: 4,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   emptyContactsBtn: {
     marginTop: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.2)',
+    paddingVertical: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 229, 255, 0.25)',
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#111827',
+    backgroundColor: 'rgba(0, 229, 255, 0.02)',
   },
   emptyContactsText: {
     color: '#00E5FF',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   settingsCard: {
     backgroundColor: '#111827',
@@ -807,6 +829,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1B15',
     borderColor: '#FFA000',
     marginBottom: 24,
+    borderRadius: 16,
   },
   warningTitle: {
     color: '#FFA000',
