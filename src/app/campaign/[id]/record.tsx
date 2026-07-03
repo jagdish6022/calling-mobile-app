@@ -136,7 +136,7 @@ export default function RecordAudioScreen() {
       setSaving(true);
       await CallingAppModule.updateCampaignAudio(campaignId, tempFilePath);
       Alert.alert('Success', 'Campaign voice recording saved successfully!', [
-        { text: 'OK', onPress: () => router.replace(`/campaign/${campaignId}`) }
+        { text: 'OK', onPress: () => router.replace({ pathname: '/campaign/[id]', params: { id: campaignId.toString() } }) }
       ]);
     } catch (e) {
       Alert.alert('Error', 'Failed to save recording to campaign');
@@ -172,7 +172,7 @@ export default function RecordAudioScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace(`/campaign/${campaignId}`)}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace({ pathname: '/campaign/[id]', params: { id: campaignId.toString() } })}>
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <View>

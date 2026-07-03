@@ -83,7 +83,7 @@ export default function CampaignDetailScreen() {
         'Voice Message Missing',
         'You have not recorded your voice message yet. Do you want to proceed playing only the Text-To-Speech greeting (e.g. "Hello John") without your recorded voice message?',
         [
-          { text: 'Go Record', onPress: () => router.push(`/campaign/${campaignId}/record`), style: 'cancel' },
+          { text: 'Go Record', onPress: () => router.push({ pathname: '/campaign/[id]/record', params: { id: campaignId.toString() } }), style: 'cancel' },
           { text: 'Start with Voice Only', onPress: () => triggerStart() }
         ]
       );
@@ -233,7 +233,7 @@ export default function CampaignDetailScreen() {
                   Step 1: Record Voice Message
                 </Text>
                 {!hasVoiceMessage && (
-                  <TouchableOpacity onPress={() => router.push(`/campaign/${campaignId}/record`)}>
+                  <TouchableOpacity onPress={() => router.push({ pathname: '/campaign/[id]/record', params: { id: campaignId.toString() } })}>
                     <Text style={styles.checkActionText}>Tap to Record Voice message</Text>
                   </TouchableOpacity>
                 )}
@@ -251,7 +251,7 @@ export default function CampaignDetailScreen() {
                   Step 2: Add Contacts ({total} added)
                 </Text>
                 {!hasContacts && (
-                  <TouchableOpacity onPress={() => router.push(`/campaign/${campaignId}/contacts`)}>
+                  <TouchableOpacity onPress={() => router.push({ pathname: '/campaign/[id]/contacts', params: { id: campaignId.toString() } })}>
                     <Text style={styles.checkActionText}>Tap to Import Contacts (Excel/CSV)</Text>
                   </TouchableOpacity>
                 )}
@@ -354,7 +354,7 @@ export default function CampaignDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.reRecordBtn}
-                  onPress={() => router.push(`/campaign/${campaignId}/record`)}
+                  onPress={() => router.push({ pathname: '/campaign/[id]/record', params: { id: campaignId.toString() } })}
                 >
                   <Ionicons name="refresh" size={18} color="#FFF" />
                 </TouchableOpacity>
@@ -365,7 +365,7 @@ export default function CampaignDetailScreen() {
               <Text style={styles.noAudioText}>No recorded message yet. Record one to play it during the call.</Text>
               <TouchableOpacity
                 style={styles.recordBtn}
-                onPress={() => router.push(`/campaign/${campaignId}/record`)}
+                onPress={() => router.push({ pathname: '/campaign/[id]/record', params: { id: campaignId.toString() } })}
               >
                 <Ionicons name="mic" size={18} color="#000" />
                 <Text style={styles.recordBtnText}>Record message</Text>
@@ -379,7 +379,7 @@ export default function CampaignDetailScreen() {
           <Text style={styles.sectionTitle}>Contacts List ({total})</Text>
           <TouchableOpacity
             style={styles.manageBtn}
-            onPress={() => router.push(`/campaign/${campaignId}/contacts`)}
+            onPress={() => router.push({ pathname: '/campaign/[id]/contacts', params: { id: campaignId.toString() } })}
           >
             <Ionicons name="people-outline" size={16} color="#00E5FF" />
             <Text style={styles.manageBtnText}>Manage Contacts</Text>
@@ -413,7 +413,7 @@ export default function CampaignDetailScreen() {
           {total === 0 && (
             <TouchableOpacity
               style={styles.emptyContactsBtn}
-              onPress={() => router.push(`/campaign/${campaignId}/contacts`)}
+              onPress={() => router.push({ pathname: '/campaign/[id]/contacts', params: { id: campaignId.toString() } })}
             >
               <Ionicons name="cloud-upload-outline" size={24} color="#00E5FF" />
               <Text style={styles.emptyContactsText}>Upload Contact Sheet (Excel/CSV)</Text>

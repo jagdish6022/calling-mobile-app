@@ -391,7 +391,10 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={camp.campaignId}
                 style={styles.campaignItem}
-                onPress={() => router.push(`/campaign/${camp.campaignId}`)}
+                onPress={() => router.push({
+                  pathname: '/campaign/[id]',
+                  params: { id: camp.campaignId.toString() }
+                })}
               >
                 <GlassCard style={[styles.campaignCard, camp.status === 'RUNNING' && styles.runningCampaignCard]}>
                   <View style={styles.campaignMeta}>

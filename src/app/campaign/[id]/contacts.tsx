@@ -139,7 +139,7 @@ export default function ContactsScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace(`/campaign/${campaignId}`)}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace({ pathname: '/campaign/[id]', params: { id: campaignId.toString() } })}>
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <View>

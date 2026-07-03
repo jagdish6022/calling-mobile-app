@@ -58,7 +58,10 @@ export default function NewCampaignScreen() {
     try {
       const campaign = await CallingAppModule.createCampaign(name, delayVal, retryVal);
       // Navigate to campaign detail screen to add contacts and record audio
-      router.replace(`/campaign/${campaign.campaignId}`);
+      router.replace({
+        pathname: '/campaign/[id]',
+        params: { id: campaign.campaignId.toString() }
+      });
     } catch (e) {
       Alert.alert('Error', 'Failed to create campaign');
     }
