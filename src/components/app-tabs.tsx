@@ -14,26 +14,20 @@ export default function AppTabs() {
         tabBarActiveTintColor: '#00E5FF',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
-          position: 'absolute',
-          bottom: 16,
-          left: 16,
-          right: 16,
-          height: 64,
-          borderRadius: 20,
           backgroundColor: '#111827',
-          borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.08)',
-          shadowColor: '#000',
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 5 },
-          elevation: 8,
-          paddingBottom: 10,
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255, 255, 255, 0.08)',
+          height: 76,
+          paddingBottom: 14,
           paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '700',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 2,
         },
       }}
     >
@@ -42,7 +36,7 @@ export default function AppTabs() {
         options={{
           title: 'Dashboard',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -52,7 +46,7 @@ export default function AppTabs() {
         options={{
           title: 'Logs',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'list' : 'list-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'list' : 'list-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -62,7 +56,7 @@ export default function AppTabs() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
           ),
         }}
       />
