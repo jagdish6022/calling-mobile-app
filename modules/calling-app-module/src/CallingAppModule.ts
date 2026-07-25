@@ -268,8 +268,34 @@ try {
       currentRecordingPath = '';
       return path;
     }
+    private listeners: Record<string, Function[]> = {};
+
+    addListener(eventName: string, listener: Function) {
+      if (!this.listeners[eventName]) {
+        this.listeners[eventName] = [];
+      }
+      this.listeners[eventName].push(listener);
+      return {
+        remove: () => {
+          this.listeners[eventName] = this.listeners[eventName]?.filter(l => l !== listener) || [];
+        }
+      };
+    }
+
+    removeListeners() {}
+
+    private emitEvent(eventName: string, data: any) {
+      this.listeners[eventName]?.forEach(l => l(data));
+    }
+
     async playAudio(filePath: string) {
       isAudioPlaying = true;
+      setTimeout(() => {
+        if (isAudioPlaying) {
+          isAudioPlaying = false;
+          this.emitEvent('onAudioPlaybackFinished', { success: true });
+        }
+      }, 3000);
       return true;
     }
     async stopAudio() {

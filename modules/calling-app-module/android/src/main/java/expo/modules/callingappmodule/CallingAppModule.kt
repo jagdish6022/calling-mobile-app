@@ -28,6 +28,7 @@ class CallingAppModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("CallingAppModule")
+    Events("onAudioPlaybackFinished")
 
     // --- Campaign CRUD ---
     AsyncFunction("createCampaign") { campaignName: String, delay: Int, retry: Int ->
@@ -185,7 +186,7 @@ class CallingAppModule : Module() {
             val parts = line.split(",")
             if (parts.size > nameIndex && parts.size > phoneIndex) {
               val rawName = parts[nameIndex].trim()
-              val rawPhone = parts[phoneIndex].trim().filter { it.isDigit() }
+              val rawPhone = parts[phoneIndex].trim().filter { it.isDigit() || it == '+' }.toString()
               
               if (rawName.isNotEmpty() && rawPhone.isNotEmpty() && rawPhone.length in 7..15) {
                 val isDup = contactsToInsert.any { it.phoneNumber == rawPhone }
@@ -447,12 +448,16 @@ class CallingAppModule : Module() {
 
     AsyncFunction("playAudio") { filePath: String ->
       try {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        audioManager.mode = android.media.AudioManager.MODE_NORMAL
+
         localPlayer?.release()
         localPlayer = android.media.MediaPlayer().apply {
           setDataSource(filePath)
           setOnCompletionListener {
             it.release()
             localPlayer = null
+            sendEvent("onAudioPlaybackFinished", mapOf("success" to true))
           }
           prepare()
           start()

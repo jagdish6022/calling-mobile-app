@@ -29,6 +29,16 @@ export default function RecordAudioScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationTimer = useRef<any>(null);
 
+  // Listen for audio playback finished event
+  useEffect(() => {
+    const sub = CallingAppModule.addListener('onAudioPlaybackFinished', () => {
+      setIsPlaying(false);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   // Pulse animation loop
   useEffect(() => {
     let animation: Animated.CompositeAnimation;
@@ -77,10 +87,25 @@ export default function RecordAudioScreen() {
   }, [isRecording]);
 
   const handleStartRecord = async () => {
+    if (isNaN(campaignId)) return;
     try {
-      // If we have a previous player active, stop it
       if (isPlaying) {
         await handleStopAudio();
+      }
+
+      // Check and request microphone permissions
+      const perms = await CallingAppModule.checkPermissions();
+      if (!perms.RECORD_AUDIO) {
+        const requested = await CallingAppModule.requestPermissions();
+        if (!requested) {
+          Alert.alert('Permission Denied', 'Microphone permission is required to record voice messages.');
+          return;
+        }
+        const checkAgain = await CallingAppModule.checkPermissions();
+        if (!checkAgain.RECORD_AUDIO) {
+          Alert.alert('Permission Denied', 'Microphone permission is required to record voice messages.');
+          return;
+        }
       }
 
       setRecordDuration(0);

@@ -9,13 +9,17 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.telecom.TelecomManager
+import android.telecom.PhoneAccountHandle
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
+import android.content.pm.PackageManager
+import android.Manifest
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -203,11 +207,39 @@ class CampaignWorker(
 
         try {
             // Trigger dialing
-            val intent = Intent(Intent.ACTION_CALL).apply {
-                data = Uri.parse("tel:${contact.phoneNumber}")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val dialableNumber = contact.phoneNumber.filter { it.isDigit() || it == '+' }.toString()
+            var callPlaced = false
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && telecomManager != null) {
+                try {
+                    val hasReadPhoneState = applicationContext.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+                    val hasCallPhone = applicationContext.checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasReadPhoneState && hasCallPhone) {
+                        val accounts = telecomManager.getCallCapablePhoneAccounts()
+                        if (!accounts.isNullOrEmpty()) {
+                            val accountHandle = accounts[0]
+                            val uri = Uri.fromParts("tel", dialableNumber, null)
+                            val extras = Bundle().apply {
+                                putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, accountHandle)
+                            }
+                            telecomManager.placeCall(uri, extras)
+                            callPlaced = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
-            applicationContext.startActivity(intent)
+
+            if (!callPlaced) {
+                // Fallback to legacy Intent.ACTION_CALL if TelecomManager fails or is unavailable
+                val intent = Intent(Intent.ACTION_CALL).apply {
+                    data = Uri.parse("tel:$dialableNumber")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                applicationContext.startActivity(intent)
+            }
 
             // Wait for call state to become OFFHOOK (meaning call placement started)
             // Wait up to 10 seconds for user to place the call

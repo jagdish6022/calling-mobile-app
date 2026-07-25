@@ -25,6 +25,16 @@ export default function CampaignDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Listen for audio playback finished event
+  useEffect(() => {
+    const sub = CallingAppModule.addListener('onAudioPlaybackFinished', () => {
+      setIsPlaying(false);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   const loadData = async () => {
     if (isNaN(campaignId)) return;
     try {
