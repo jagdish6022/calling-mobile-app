@@ -83,6 +83,29 @@ export default function CampaignDetailScreen() {
   const handleStart = async () => {
     if (!campaign) return;
 
+    // Check & request required permissions before doing anything
+    try {
+      const perms = await CallingAppModule.checkPermissions();
+      if (!perms.CALL_PHONE || !perms.READ_PHONE_STATE) {
+        const granted = await CallingAppModule.requestPermissions();
+        if (!granted) {
+          Alert.alert(
+            'Permissions Required',
+            'Please grant Phone and Call permissions so the app can dial contacts. Go to Settings → App Permissions and enable them, then try again.'
+          );
+          return;
+        }
+        // Re-check after the permission dialog
+        const permsAfter = await CallingAppModule.checkPermissions();
+        if (!permsAfter.CALL_PHONE || !permsAfter.READ_PHONE_STATE) {
+          Alert.alert('Permissions Required', 'CALL_PHONE and READ_PHONE_STATE permissions are needed to run a campaign.');
+          return;
+        }
+      }
+    } catch (permErr) {
+      console.error('Permission check error:', permErr);
+    }
+
     if (contacts.length === 0) {
       Alert.alert('Contacts Missing', 'Please add or import contacts to this campaign first.');
       return;
@@ -109,7 +132,11 @@ export default function CampaignDetailScreen() {
       await CallingAppModule.startCampaign(campaignId);
       loadData();
     } catch (e) {
-      Alert.alert('Error', 'Failed to start calling');
+      // Roll back status so the campaign isn't stuck in RUNNING with no active worker
+      try {
+        await CallingAppModule.updateCampaignStatus(campaignId, 'DRAFT');
+      } catch (_) {}
+      Alert.alert('Error', 'Failed to start calling. Please check permissions and try again.');
     }
   };
 

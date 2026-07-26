@@ -114,14 +114,12 @@ class CampaignWorker(
             val ttsLanguage = settings?.ttsLanguage ?: "en-US"
             val audioVolume = settings?.audioVolume ?: 1.0f
 
-            // Find next eligible contact.
-            // Priority 1: contacts not yet called (PENDING) — always call them first.
-            // Priority 2: contacts that failed/were busy and still have retries left.
+            // Find next eligible contact
+            // Eligible contact: status is PENDING, OR status is not COMPLETED and attempts <= maxRetries
             val contacts = db.contactDao().getContactsForCampaign(campaignId)
-            val nextContact = contacts.firstOrNull { it.status == "PENDING" }
-                ?: contacts.firstOrNull {
-                    it.status != "COMPLETED" && it.status != "PENDING" && it.attempts <= maxRetries
-                }
+            val nextContact = contacts.firstOrNull {
+                it.status == "PENDING" || (it.status != "COMPLETED" && it.attempts <= maxRetries)
+            }
 
             if (nextContact == null) {
                 // All contacts completed
