@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# Android build outputs and intermediate folders (recursive)
+build/
+.gradle/
+.cxx/
+
