@@ -10,16 +10,15 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.telecom.TelecomManager
-import android.telecom.PhoneAccountHandle
 import android.telephony.PhoneStateListener
+import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.content.pm.PackageManager
 import android.Manifest
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -94,19 +93,16 @@ class CampaignWorker(
 
     private suspend fun runCampaignLoop(campaignId: Int) {
         while (true) {
-            // Check if worker has been stopped
             if (isStopped) {
                 db.campaignDao().updateCampaignStatus(campaignId, "PAUSED")
                 break
             }
 
-            // Check if campaign is still marked as RUNNING in DB (user might have paused it)
             val campaign = db.campaignDao().getCampaignById(campaignId)
             if (campaign == null || campaign.status != "RUNNING") {
                 break
             }
 
-            // Get Settings
             val settings = db.settingsDao().getSettings()
             val delaySeconds = settings?.delayBetweenCalls ?: campaign.delayBetweenCalls
             val maxRetries = settings?.retryCount ?: campaign.retryCount
@@ -114,31 +110,23 @@ class CampaignWorker(
             val ttsLanguage = settings?.ttsLanguage ?: "en-US"
             val audioVolume = settings?.audioVolume ?: 1.0f
 
-            // Find next eligible contact.
-            // Priority 1: contacts not yet called (PENDING) — always call them first.
-            // Priority 2: contacts that failed/were busy and still have retries left.
             val contacts = db.contactDao().getContactsForCampaign(campaignId)
-            val nextContact = contacts.firstOrNull { it.status == "PENDING" }
-                ?: contacts.firstOrNull {
-                    it.status != "COMPLETED" && it.status != "PENDING" && it.attempts <= maxRetries
-                }
+            val nextContact = contacts.firstOrNull {
+                it.status == "PENDING" || (it.status != "COMPLETED" && it.attempts <= maxRetries)
+            }
 
             if (nextContact == null) {
-                // All contacts completed
                 db.campaignDao().updateCampaignStatus(campaignId, "COMPLETED")
                 showCompletedNotification(campaign.campaignName)
                 break
             }
 
-            // Update UI/Notification with progress
             val completedCount = contacts.count { it.status == "COMPLETED" }
             val progressText = "Calling ${nextContact.customerName} (${completedCount + 1}/${contacts.size})"
             setForeground(createForegroundInfo(progressText))
 
-            // Process single contact call
             processCall(campaign, nextContact, autoEndCall, ttsLanguage, audioVolume)
 
-            // Wait before next call
             if (!isStopped) {
                 delay(delaySeconds * 1000L)
             }
@@ -161,8 +149,6 @@ class CampaignWorker(
 
         // Initialize TTS
         val ttsReady = CompletableDeferred<Boolean>()
-        val mainHandler = Handler(Looper.getMainLooper())
-
         withContext(Dispatchers.Main) {
             tts = TextToSpeech(applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
@@ -182,29 +168,35 @@ class CampaignWorker(
 
         val isTtsInitialized = ttsReady.await()
 
-        // Listen for call state transitions
+        // Track call state — use TelephonyCallback on API 31+, PhoneStateListener on older
         val callConnected = CompletableDeferred<Boolean>()
         val callEnded = CompletableDeferred<Unit>()
 
-        val stateListener = object : PhoneStateListener() {
-            override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                when (state) {
-                    TelephonyManager.CALL_STATE_OFFHOOK -> {
-                        // Call dialing/active
-                        callConnected.complete(true)
-                    }
-                    TelephonyManager.CALL_STATE_IDLE -> {
-                        // Call hung up
-                        callConnected.complete(false) // If not already connected
-                        callEnded.complete(Unit)
-                    }
+        // The unregister lambda is set inside the version branches below
+        val unregisterCallListener: suspend () -> Unit
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val callback = makeTelephonyCallback(callConnected, callEnded)
+            withContext(Dispatchers.Main) {
+                telephonyManager.registerTelephonyCallback(applicationContext.mainExecutor, callback)
+            }
+            unregisterCallListener = {
+                withContext(Dispatchers.Main) {
+                    telephonyManager.unregisterTelephonyCallback(callback)
                 }
             }
-        }
-
-        // Register listener
-        withContext(Dispatchers.Main) {
-            telephonyManager.listen(stateListener, PhoneStateListener.LISTEN_CALL_STATE)
+        } else {
+            val listener = makePhoneStateListener(callConnected, callEnded)
+            withContext(Dispatchers.Main) {
+                @Suppress("DEPRECATION")
+                telephonyManager.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+            }
+            unregisterCallListener = {
+                withContext(Dispatchers.Main) {
+                    @Suppress("DEPRECATION")
+                    telephonyManager.listen(listener, PhoneStateListener.LISTEN_NONE)
+                }
+            }
         }
 
         try {
@@ -220,10 +212,9 @@ class CampaignWorker(
                     if (hasReadPhoneState && hasCallPhone) {
                         val accounts = telecomManager.getCallCapablePhoneAccounts()
                         if (!accounts.isNullOrEmpty()) {
-                            val accountHandle = accounts[0]
                             val uri = Uri.fromParts("tel", dialableNumber, null)
                             val extras = Bundle().apply {
-                                putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, accountHandle)
+                                putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, accounts[0])
                             }
                             telecomManager.placeCall(uri, extras)
                             callPlaced = true
@@ -235,7 +226,7 @@ class CampaignWorker(
             }
 
             if (!callPlaced) {
-                // Fallback to legacy Intent.ACTION_CALL if TelecomManager fails or is unavailable
+                // Fallback to Intent.ACTION_CALL
                 val intent = Intent(Intent.ACTION_CALL).apply {
                     data = Uri.parse("tel:$dialableNumber")
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -243,42 +234,29 @@ class CampaignWorker(
                 applicationContext.startActivity(intent)
             }
 
-            // Wait for call state to become OFFHOOK (meaning call placement started)
-            // Wait up to 10 seconds for user to place the call
+            // Wait up to 10 seconds for the call to become active (OFFHOOK)
             val offHook = withTimeoutOrNull(10000) {
                 callConnected.await()
             } ?: false
 
             if (offHook) {
-                // Call successfully initiated (off-hook)
-                // Standard Android cannot detect if the other person picks up, so we wait 6 seconds
+                // Call is active — wait 6 s for recipient to answer before playing audio
                 delay(6000L)
 
-                // Check if call is still active (hasn't went back to IDLE)
                 if (!callEnded.isCompleted) {
-                    // Route audio to speakerphone
                     audioManager.mode = AudioManager.MODE_IN_CALL
                     audioManager.isSpeakerphoneOn = true
 
-                    // Speak name using TTS
+                    // Greet by name via TTS
                     if (isTtsInitialized && tts != null) {
                         val ttsCompleted = CompletableDeferred<Unit>()
                         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) {}
-                            override fun onDone(utteranceId: String?) {
-                                ttsCompleted.complete(Unit)
-                            }
-                            override fun onError(utteranceId: String?) {
-                                ttsCompleted.complete(Unit)
-                            }
+                            override fun onDone(utteranceId: String?) { ttsCompleted.complete(Unit) }
+                            override fun onError(utteranceId: String?) { ttsCompleted.complete(Unit) }
                         })
-                        val utteranceId = UUID.randomUUID().toString()
-                        tts?.speak("Hello ${contact.customerName}", TextToSpeech.QUEUE_FLUSH, null, utteranceId)
-
-                        // Wait for TTS to finish (max 10s)
-                        withTimeoutOrNull(10000) {
-                            ttsCompleted.await()
-                        }
+                        tts?.speak("Hello ${contact.customerName}", TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
+                        withTimeoutOrNull(10000) { ttsCompleted.await() }
                     }
 
                     // Play recorded audio
@@ -289,30 +267,21 @@ class CampaignWorker(
                             mediaPlayer = MediaPlayer().apply {
                                 setDataSource(audioFile.absolutePath)
                                 setVolume(audioVolume, audioVolume)
-                                setOnCompletionListener {
-                                    audioCompleted.complete(Unit)
-                                }
-                                setOnErrorListener { _, _, _ ->
-                                    audioCompleted.complete(Unit)
-                                    true
-                                }
+                                setOnCompletionListener { audioCompleted.complete(Unit) }
+                                setOnErrorListener { _, _, _ -> audioCompleted.complete(Unit); true }
                                 prepare()
                                 start()
                             }
                         }
-
-                        // Wait for audio recording to complete
-                        withTimeoutOrNull(60000) { // Max 1 minute recording
-                            audioCompleted.await()
-                        }
+                        withTimeoutOrNull(60000) { audioCompleted.await() }
                         audioPlayed = true
                         callStatus = "COMPLETED"
                     } else {
-                        // No audio file recorded, but TTS played
+                        // No audio file but TTS played — still counts as delivered
                         callStatus = "COMPLETED"
                     }
 
-                    // Attempt to end call automatically if supported and enabled
+                    // Auto-end call if enabled
                     if (autoEndCall && telecomManager != null) {
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -320,67 +289,97 @@ class CampaignWorker(
                             }
                         } catch (e: SecurityException) {
                             e.printStackTrace()
-                            // Permission issue, user must hang up manually
                         }
                     }
                 } else {
-                    // Call went idle before connection delay, meaning busy/rejected/failed
+                    // Call ended before audio could play (busy/rejected)
                     callStatus = "BUSY"
                 }
             } else {
                 callStatus = "FAILED"
             }
 
-            // Wait for call to completely go back to IDLE (if not already IDLE)
-            withTimeoutOrNull(15000) {
-                callEnded.await()
-            }
+            // Wait for call to return to IDLE
+            withTimeoutOrNull(15000) { callEnded.await() }
 
         } catch (e: Exception) {
             e.printStackTrace()
             callStatus = "FAILED"
         } finally {
-            // Unregister telephony listener
-            withContext(Dispatchers.Main) {
-                telephonyManager.listen(stateListener, PhoneStateListener.LISTEN_NONE)
-            }
+            // Unregister telephony listener/callback
+            unregisterCallListener()
 
-            // Restore speakerphone setting
+            // Restore audio state
             audioManager.isSpeakerphoneOn = false
             audioManager.mode = AudioManager.MODE_NORMAL
 
-            // Save Call Log
+            // Save call log
             val callEndTime = System.currentTimeMillis()
             val durationSeconds = ((callEndTime - callStartTime) / 1000).toInt().coerceAtLeast(0)
 
-            // Let's refine call status based on duration if call ended prematurely
-            val finalStatus = if (callStatus == "COMPLETED" && durationSeconds < 8) {
-                "REJECTED"
-            } else {
-                callStatus
-            }
+            val finalStatus = if (callStatus == "COMPLETED" && durationSeconds < 8) "REJECTED" else callStatus
 
             db.contactDao().updateContactStatus(contact.contactId, finalStatus)
 
-            val log = CallLogEntity(
-                campaignId = campaign.campaignId,
-                contactId = contact.contactId,
-                customerName = contact.customerName,
-                phoneNumber = contact.phoneNumber,
-                callStartTime = callStartTime,
-                callEndTime = callEndTime,
-                duration = durationSeconds,
-                status = finalStatus,
-                audioPlayed = audioPlayed
+            db.callLogDao().insertLog(
+                CallLogEntity(
+                    campaignId = campaign.campaignId,
+                    contactId = contact.contactId,
+                    customerName = contact.customerName,
+                    phoneNumber = contact.phoneNumber,
+                    callStartTime = callStartTime,
+                    callEndTime = callEndTime,
+                    duration = durationSeconds,
+                    status = finalStatus,
+                    audioPlayed = audioPlayed
+                )
             )
-            db.callLogDao().insertLog(log)
 
-            // Shutdown TTS for this call to release resources
+            // Release TTS and media player for this call
             withContext(Dispatchers.Main) {
                 tts?.shutdown()
                 tts = null
                 mediaPlayer?.release()
                 mediaPlayer = null
+            }
+        }
+    }
+
+    /**
+     * Creates a TelephonyCallback for Android 12+ (API 31+).
+     * Updates [callConnected] and [callEnded] based on call state changes.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun makeTelephonyCallback(
+        callConnected: CompletableDeferred<Boolean>,
+        callEnded: CompletableDeferred<Unit>
+    ) = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+        override fun onCallStateChanged(state: Int) {
+            when (state) {
+                TelephonyManager.CALL_STATE_OFFHOOK -> callConnected.complete(true)
+                TelephonyManager.CALL_STATE_IDLE -> {
+                    callConnected.complete(false) // No-op if already completed to true
+                    callEnded.complete(Unit)
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates a legacy PhoneStateListener for Android < 12 (API < 31).
+     */
+    @Suppress("DEPRECATION")
+    private fun makePhoneStateListener(
+        callConnected: CompletableDeferred<Boolean>,
+        callEnded: CompletableDeferred<Unit>
+    ) = object : PhoneStateListener() {
+        override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+            when (state) {
+                TelephonyManager.CALL_STATE_OFFHOOK -> callConnected.complete(true)
+                TelephonyManager.CALL_STATE_IDLE -> {
+                    callConnected.complete(false)
+                    callEnded.complete(Unit)
+                }
             }
         }
     }
@@ -403,11 +402,13 @@ class CampaignWorker(
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
+        // Use DATA_SYNC foreground service type — PHONE_CALL type requires the app to be
+        // a registered Telecom connection service, which this app is not.
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
             ForegroundInfo(NOTIFICATION_ID, notification)
@@ -428,22 +429,18 @@ class CampaignWorker(
     }
 
     private fun showCompletedNotification(campaignName: String) {
-        val completedNotificationId = NOTIFICATION_ID + 1
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("Campaign Completed")
             .setContentText("Campaign '$campaignName' has finished running.")
             .setSmallIcon(android.R.drawable.stat_sys_phone_call)
             .setAutoCancel(true)
             .build()
-        notificationManager.notify(completedNotificationId, notification)
+        notificationManager.notify(NOTIFICATION_ID + 1, notification)
     }
 
-    // Helper timeout builder
     private suspend fun <T> withTimeoutOrNull(timeMillis: Long, block: suspend () -> T): T? {
         return try {
-            kotlinx.coroutines.withTimeout(timeMillis) {
-                block()
-            }
+            kotlinx.coroutines.withTimeout(timeMillis) { block() }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             null
         }
