@@ -6,11 +6,11 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   Alert,
   useWindowDimensions
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -113,13 +113,17 @@ export default function LogsScreen() {
               <Text style={[styles.headerTitle, isTablet && { fontSize: 38 }]}>Call Logs</Text>
             </View>
             {selectedCampaignId !== null && logs.length > 0 && (
-              <TouchableOpacity style={styles.exportBtn} onPress={handleExport} disabled={exporting}>
+              <TouchableOpacity
+                style={[styles.exportBtn, isTablet ? styles.exportBtnTablet : styles.exportBtnCircle]}
+                onPress={handleExport}
+                disabled={exporting}
+              >
                 {exporting ? (
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
                   <>
                     <Ionicons name="share-outline" size={18} color="#000" />
-                    <Text style={styles.exportText}>Export CSV</Text>
+                    {isTablet && <Text style={styles.exportText}>Export CSV</Text>}
                   </>
                 )}
               </TouchableOpacity>
@@ -148,19 +152,19 @@ export default function LogsScreen() {
           {/* Stats Summary Row */}
           {logs.length > 0 && (
             <View style={styles.summaryRow}>
-              <View style={[styles.summaryChip, { borderColor: '#69F0AE' }]}>
+              <View style={[styles.summaryChip, isTablet ? styles.summaryChipTablet : styles.summaryChipMobile, { borderColor: '#69F0AE' }]}>
                 <Text style={[styles.summaryNum, { color: '#69F0AE' }]}>{delivered}</Text>
                 <Text style={styles.summaryLbl}>Delivered</Text>
               </View>
-              <View style={[styles.summaryChip, { borderColor: '#FFAB40' }]}>
+              <View style={[styles.summaryChip, isTablet ? styles.summaryChipTablet : styles.summaryChipMobile, { borderColor: '#FFAB40' }]}>
                 <Text style={[styles.summaryNum, { color: '#FFAB40' }]}>{busy}</Text>
                 <Text style={styles.summaryLbl}>Busy / No Answer</Text>
               </View>
-              <View style={[styles.summaryChip, { borderColor: '#FF5252' }]}>
+              <View style={[styles.summaryChip, isTablet ? styles.summaryChipTablet : styles.summaryChipMobile, { borderColor: '#FF5252' }]}>
                 <Text style={[styles.summaryNum, { color: '#FF5252' }]}>{failed}</Text>
                 <Text style={styles.summaryLbl}>Failed</Text>
               </View>
-              <View style={[styles.summaryChip, { borderColor: '#00E5FF' }]}>
+              <View style={[styles.summaryChip, isTablet ? styles.summaryChipTablet : styles.summaryChipMobile, { borderColor: '#00E5FF' }]}>
                 <Text style={[styles.summaryNum, { color: '#00E5FF' }]}>{audioPlayed}</Text>
                 <Text style={styles.summaryLbl}>Audio Played</Text>
               </View>
@@ -244,26 +248,47 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: '#00E5FF', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   headerTitle: { color: '#FFF', fontSize: 32, fontWeight: '800' },
   exportBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#00E5FF',
-    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, gap: 6, elevation: 3,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#00E5FF', elevation: 3,
+    shadowColor: '#00E5FF', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2, shadowRadius: 4,
+  },
+  exportBtnCircle: {
+    width: 44, height: 44, borderRadius: 22,
+  },
+  exportBtnTablet: {
+    paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, gap: 6,
   },
   exportText: { color: '#000', fontWeight: '700', fontSize: 13 },
 
-  pickerWrapper: { marginBottom: 16, height: 46 },
+  pickerWrapper: { marginBottom: 16 },
   pickerScroll: { gap: 8, paddingRight: 16 },
   pickerItem: {
     backgroundColor: '#111827', paddingHorizontal: 18, paddingVertical: 12,
-    borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 46,
+    borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
     justifyContent: 'center',
   },
   pickerItemActive: { backgroundColor: '#1E293B', borderColor: '#00E5FF' },
   pickerText: { color: '#9CA3AF', fontSize: 14, fontWeight: '600' },
   pickerTextActive: { color: '#00E5FF', fontWeight: '700' },
 
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  summaryRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 8, 
+    marginBottom: 16,
+    justifyContent: 'space-between'
+  },
   summaryChip: {
-    flex: 1, minWidth: 70, backgroundColor: '#111827', borderRadius: 12,
+    backgroundColor: '#111827', borderRadius: 12,
     borderWidth: 1, paddingVertical: 10, alignItems: 'center',
+  },
+  summaryChipMobile: {
+    width: '48.5%',
+  },
+  summaryChipTablet: {
+    flex: 1,
+    minWidth: 120,
   },
   summaryNum: { fontSize: 20, fontWeight: '800' },
   summaryLbl: { color: '#6B7280', fontSize: 10, fontWeight: '600', marginTop: 2, textAlign: 'center' },

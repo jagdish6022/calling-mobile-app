@@ -227,11 +227,11 @@ export default function HomeScreen() {
               <Text style={[styles.headerTitle, isTablet && { fontSize: 40 }]}>My Dashboard</Text>
             </View>
             <TouchableOpacity
-              style={[styles.newButton, isTablet && { paddingHorizontal: 24, paddingVertical: 14 }]}
+              style={[styles.newButton, isTablet ? styles.newButtonTablet : styles.newButtonCircle]}
               onPress={() => router.push('/campaign/new')}
             >
               <Ionicons name="add" size={24} color="#000" />
-              <Text style={[styles.newButtonText, isTablet && { fontSize: 16 }]}>New Campaign</Text>
+              {isTablet && <Text style={styles.newButtonText}>New Campaign</Text>}
             </TouchableOpacity>
           </View>
 
@@ -426,8 +426,16 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: '#00E5FF', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   headerTitle: { color: '#FFF', fontSize: 32, fontWeight: '800' },
   newButton: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#00E5FF',
-    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, gap: 6, elevation: 3,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#00E5FF', elevation: 3,
+    shadowColor: '#00E5FF', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2, shadowRadius: 4,
+  },
+  newButtonCircle: {
+    width: 44, height: 44, borderRadius: 22,
+  },
+  newButtonTablet: {
+    paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, gap: 6,
   },
   newButtonText: { color: '#000', fontWeight: '700', fontSize: 14 },
 

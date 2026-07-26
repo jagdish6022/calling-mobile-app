@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   useWindowDimensions
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import CallingAppModule, { Settings } from '@/modules/calling-app-module/src/CallingAppModule';
 import GlassCard from '@/components/GlassCard';
