@@ -19,7 +19,7 @@ module.exports = function withWorkManagerForeground(config) {
       $: {
         'android:name': 'androidx.work.impl.background.systemforeground.SystemForegroundService',
         'android:exported': 'false',
-        'android:foregroundServiceType': 'phoneCall',
+        'android:foregroundServiceType': 'dataSync',
         'tools:node': 'merge',
         'tools:replace': 'android:foregroundServiceType'
       }
