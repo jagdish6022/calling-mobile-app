@@ -1,0 +1,5 @@
+{
+  "name": "calling-app-module",
+  "version": "0.1.0",
+  "main": "src/CallingAppModule.ts"
+}
